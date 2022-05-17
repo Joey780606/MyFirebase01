@@ -13,11 +13,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.firebasedemo.ui.theme.FirebaseDemoTheme
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.analytics.ktx.analytics
+import com.google.firebase.ktx.Firebase
 
+/*
+    Author: Joey yang
+    Note:
+    1. About join firebase into project, you can refer to udemy class.
+ */
 class MainActivity : ComponentActivity() {
+    private lateinit var analytics: FirebaseAnalytics
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            analytics = Firebase.analytics
             FirebaseDemoTheme {
                 val navController = rememberNavController() //Navigation Step2
 
