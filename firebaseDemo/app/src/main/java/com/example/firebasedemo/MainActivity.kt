@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,6 +31,7 @@ import com.example.firebasedemo.ui.theme.YellowFFEB3B
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 
@@ -47,7 +50,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var analytics: FirebaseAnalytics
     private lateinit var auth: FirebaseAuth
     private val mainViewModel by viewModels<MainViewModel>()
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,7 +70,7 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("loginMail_screen") {
                         //first screen
-                        LoginMailScreen02(navController = navController, auth, this@MainActivity)
+                        LoginMailScreen02(navController = navController, auth, this@MainActivity, mainViewModel)
                     }
                     composable("loginNewUser_screen") {
                         //first screen
@@ -109,11 +111,11 @@ fun LoginScreen01(navController: NavController, auth: FirebaseAuth, activity: Ma
             }
         }
 
-    //TODO: Need to join viewModel and remember State to fit MVVM style
+    //TODO("Need to join viewModel and remember State to fit MVVM style")
 }
 
 @Composable
-fun LoginMailScreen02(navController: NavController, auth: FirebaseAuth, activity: MainActivity) {
+fun LoginMailScreen02(navController: NavController, auth: FirebaseAuth, activity: MainActivity, mainViewModel: MainViewModel) {
     var emailText by remember { mutableStateOf("") }
     var passwordText by remember { mutableStateOf("") }
 
@@ -121,7 +123,26 @@ fun LoginMailScreen02(navController: NavController, auth: FirebaseAuth, activity
     val pressState = interactionSourceTest.collectIsPressedAsState()
     val borderColor = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
 
-    //TODO: Need to modify UI more beautiful
+    val loginUser by mainViewModel._loginUser.observeAsState(null)
+
+    var loginUserMail = ""
+    var nickName = ""
+
+    mainViewModel.authStateListener(auth)
+    mainViewModel.updateUserStatus(auth)
+    loginUser?.let { user ->
+        user.email?.let { mail ->
+            loginUserMail = mail
+        }
+        user.displayName?.let { name ->
+            nickName = name
+        }
+    }
+    if(loginUser == null)
+        Log.v("Test", "LoginUser 00 = null")
+    else
+        Log.v("Test", "LoginUser 01 = ${loginUser!!.toString()},  ${loginUser!!.email}")
+    //TODO("Need to modify UI more beautiful")
     Column(verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = "Second screen: Login mail screen",
@@ -147,8 +168,25 @@ fun LoginMailScreen02(navController: NavController, auth: FirebaseAuth, activity
                 backgroundColor = Color.White,
                 contentColor = Color.Red),
             contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
-            onClick = { Log.v("Test", "${pressState.value}")}) {
-            Text(text = "Login") }
+            onClick = { if(loginUserMail == "") {
+                if(emailText.isEmpty()) {
+                    Toast.makeText(activity, "Please enter account", Toast.LENGTH_LONG).show()
+                    return@Button
+                }
+                if(passwordText.isEmpty()) {
+                    Toast.makeText(activity, "Please enter password", Toast.LENGTH_LONG).show()
+                    return@Button
+                }
+                auth.signInWithEmailAndPassword(emailText,passwordText)
+                    .addOnFailureListener { exception ->
+                        Toast.makeText(activity, "Login error: ${exception.localizedMessage}", Toast.LENGTH_LONG).show()
+                    }
+            } else {
+                auth.signOut()
+            } })
+            {
+                Text(text = if(loginUserMail == "") "Login" else "Logout")
+            }
 
         Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
             modifier = Modifier.fillMaxHeight(0.5f),
@@ -169,7 +207,7 @@ fun LoginMailScreen02(navController: NavController, auth: FirebaseAuth, activity
             onClick = { navController.navigate("loginNewUser_screen") }) {
             Text(text = "Create new account") }
 
-        Text(text = "Status: ")
+        Text(text = if(loginUserMail == "") "Status: not login" else "Status: $loginUserMail login, nick name = $nickName")
     }
 }
 
@@ -184,7 +222,7 @@ fun LoginNewUser03(navController: NavController, auth: FirebaseAuth, activity: M
     val pressState = interactionSourceTest.collectIsPressedAsState()
     val borderColor = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
 
-    //TODO: Need to modify UI more beautiful
+    //TODO("Need to modify UI more beautiful")
     Column(verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = "Login new user screen",
@@ -228,6 +266,15 @@ fun LoginNewUser03(navController: NavController, auth: FirebaseAuth, activity: M
                 auth.createUserWithEmailAndPassword(emailText, passwordText).addOnCompleteListener() { task ->
                     if (task.isSuccessful) {
                         Toast.makeText(activity, "Account Created!", Toast.LENGTH_LONG).show()
+                        var user = auth.currentUser
+                        var request = UserProfileChangeRequest.Builder().setDisplayName(nickNameText).build()
+                        user?.let { userInfo ->
+                            userInfo.updateProfile(request)
+                            //要做這是因為上面的寫入,會有時間差,所以回到前頁時,DisplayName還不會被寫入,作者建議就重新再登入一次看看
+                            //但目前試還是有問題,要再改
+                            auth.signOut()
+                            auth.signInWithEmailAndPassword(emailText, passwordText)
+                        }
                         navController.navigate("loginMail_screen")
                     }
                 }.addOnFailureListener() { task ->
