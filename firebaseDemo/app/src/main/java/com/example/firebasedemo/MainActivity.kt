@@ -17,17 +17,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.firebasedemo.ui.theme.FirebaseDemoTheme
-import com.example.firebasedemo.ui.theme.Green4CAF50
-import com.example.firebasedemo.ui.theme.YellowFFEB3B
+import com.example.firebasedemo.ui.theme.*
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.auth.FirebaseAuth
@@ -62,23 +60,27 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(
                     navController = navController,
-                    startDestination = "login_screen"
+                    startDestination = "initial_screen"
                 ) {
+                    composable("initial_screen") {
+                        //first screen
+                        InitialScreen01(navController = navController)
+                    }
                     composable("login_screen") {
                         //first screen
-                        LoginScreen01(navController = navController, auth, this@MainActivity)
+                        LoginScreen02(navController = navController, auth, this@MainActivity)
                     }
                     composable("loginMail_screen") {
                         //first screen
-                        LoginMailScreen02(navController = navController, auth, this@MainActivity, mainViewModel)
+                        LoginMailScreen03(navController = navController, auth, this@MainActivity, mainViewModel)
                     }
                     composable("loginNewUser_screen") {
                         //first screen
-                        LoginNewUser03(navController = navController, auth, this@MainActivity)
+                        LoginNewUser04(navController = navController, auth, this@MainActivity)
                     }
                     composable("shop_screen") {
                         //second screen
-                        ShopScreen04(navController = navController)
+                        ShopScreen05(navController = navController)
                     }
                 }
             }
@@ -87,7 +89,52 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun LoginScreen01(navController: NavController, auth: FirebaseAuth, activity: MainActivity) {
+fun InitialScreen01(navController: NavController) {
+    val interactionSourceTest = remember { MutableInteractionSource() }
+    val pressState = interactionSourceTest.collectIsPressedAsState()
+    val colorMy = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
+    val itemList = listOf("Anonymous login", "e-mail login")
+
+    Column(verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = "Function list")
+
+        for(info in itemList) {
+            OutlinedButton(
+                onClick = {
+                    when (info) {
+                        "Anonymous login" -> navController.navigate("login_screen")
+                        "e-mail login" -> navController.navigate("loginMail_screen")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(1f),
+                enabled = true,
+                interactionSource = interactionSourceTest,
+                elevation = ButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp
+                ),     //注意,這跟官方的文件寫的不太一樣,但是不會有錯誤發生,反而用官方的寫會有錯誤發生
+                shape = MaterialTheme.shapes.large,
+                border = BorderStroke(
+                    width = 10.dp,
+                    brush = Brush.horizontalGradient(listOf(Purple700, PinkE91E63))
+                ),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    backgroundColor = colorMy,
+                    contentColor = Teal200
+                ),
+            ) {
+                Text(
+                    color = Purple500,
+                    text = info
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LoginScreen02(navController: NavController, auth: FirebaseAuth, activity: MainActivity) {
     Text(text = "First screen",
         modifier = Modifier.clickable(onClick = {
             navController.navigate("loginMail_screen")
@@ -115,7 +162,7 @@ fun LoginScreen01(navController: NavController, auth: FirebaseAuth, activity: Ma
 }
 
 @Composable
-fun LoginMailScreen02(navController: NavController, auth: FirebaseAuth, activity: MainActivity, mainViewModel: MainViewModel) {
+fun LoginMailScreen03(navController: NavController, auth: FirebaseAuth, activity: MainActivity, mainViewModel: MainViewModel) {
     var emailText by remember { mutableStateOf("") }
     var passwordText by remember { mutableStateOf("") }
 
@@ -212,7 +259,7 @@ fun LoginMailScreen02(navController: NavController, auth: FirebaseAuth, activity
 }
 
 @Composable
-fun LoginNewUser03(navController: NavController, auth: FirebaseAuth, activity: MainActivity) {
+fun LoginNewUser04(navController: NavController, auth: FirebaseAuth, activity: MainActivity) {
     var emailText by remember { mutableStateOf("") }
     var nickNameText by remember { mutableStateOf("") }
     var passwordText by remember { mutableStateOf("") }
@@ -288,7 +335,7 @@ fun LoginNewUser03(navController: NavController, auth: FirebaseAuth, activity: M
 }
 
 @Composable
-fun ShopScreen04(navController: NavController) {
+fun ShopScreen05(navController: NavController) {
 }
 
 @Composable
