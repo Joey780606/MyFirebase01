@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
@@ -31,6 +32,11 @@ import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 
 /*
@@ -47,6 +53,7 @@ import com.google.firebase.ktx.Firebase
 class MainActivity : ComponentActivity() {
     private lateinit var analytics: FirebaseAnalytics
     private lateinit var auth: FirebaseAuth
+    private lateinit var database: FirebaseDatabase
     private val mainViewModel by viewModels<MainViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,6 +61,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             analytics = Firebase.analytics
             auth = Firebase.auth
+            //重要,若伺服器選美國,就只要用Firebase.database即可,否則要把資料庫的根網址寫入,如下
+            database = Firebase.database("https://myfirebase2022-31c42-default-rtdb.asia-southeast1.firebasedatabase.app")
+
 
             FirebaseDemoTheme {
                 val navController = rememberNavController() //Navigation Step2
@@ -78,9 +88,9 @@ class MainActivity : ComponentActivity() {
                         //first screen
                         LoginNewUser04(navController = navController, auth, this@MainActivity)
                     }
-                    composable("shop_screen") {
+                    composable("shop_screen_info") {
                         //second screen
-                        ShopScreen05(navController = navController)
+                        ShopScreen05Show(navController = navController, auth, this@MainActivity, mainViewModel, database)
                     }
                 }
             }
@@ -93,7 +103,7 @@ fun InitialScreen01(navController: NavController) {
     val interactionSourceTest = remember { MutableInteractionSource() }
     val pressState = interactionSourceTest.collectIsPressedAsState()
     val colorMy = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
-    val itemList = listOf("Anonymous login", "e-mail login")
+    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info")
 
     Column(verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -105,6 +115,7 @@ fun InitialScreen01(navController: NavController) {
                     when (info) {
                         "Anonymous login" -> navController.navigate("login_screen")
                         "e-mail login" -> navController.navigate("loginMail_screen")
+                        "show shop table info" -> navController.navigate("shop_screen_info")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(1f),
@@ -131,6 +142,8 @@ fun InitialScreen01(navController: NavController) {
             }
         }
     }
+
+
 }
 
 @Composable
@@ -335,7 +348,67 @@ fun LoginNewUser04(navController: NavController, auth: FirebaseAuth, activity: M
 }
 
 @Composable
-fun ShopScreen05(navController: NavController) {
+fun ShopScreen05Show(navController: NavController, auth: FirebaseAuth, activity: MainActivity, mainViewModel: MainViewModel, database: FirebaseDatabase) {
+    // 1.先確認有無e-mail login
+    val loginUser by mainViewModel._loginUser.observeAsState(null)
+
+    //var loginUserMail = ""
+    //var nickName = ""
+    val shopInfo by mainViewModel._shopInfo.observeAsState(null)
+    mainViewModel.authStateListener(auth)
+    mainViewModel.getShopList(database)
+
+    Column(verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Shop info list",
+            modifier = Modifier.clickable(onClick = {
+                navController.navigate("login_screen")
+            })
+        )
+        //Text(text = { if(loginUser == null) "Shop info list" else "bbb" })
+        Text(text =
+            if(loginUser == null) {
+                "Not login, no shop info" }
+            else {
+                if(shopInfo == null)
+                    "Login but no shop data"
+                else "Login and have shop data"
+            })
+        LazyColumn(Modifier.fillMaxWidth()) {
+            shopInfo?.let { info ->
+                items(info.size) {
+                    for(shopData in info) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(modifier = Modifier.fillMaxWidth(0.4f), text = "店名: ${shopData.name}")
+                            Text(modifier = Modifier.fillMaxWidth(0.6f), text = "電話: ${shopData.telephone}")
+                        }
+                        Text(modifier = Modifier.fillMaxWidth(), text = "地址: ${shopData.address}")
+                        Divider(
+                            color = Color.Green,
+                            thickness = 1.dp,
+                            startIndent = 50.dp)
+                    }
+                }
+            }
+        }
+    }
+/*  The process of write to real time database, need to join a new button.
+    Log.v("TEST", "shop list 001")
+    //database.getReference("bento/store")
+
+    var mRef = database.reference.child("bento").child("store")
+    Log.v("TEST", "shop list 001 ${mRef.toString()}")
+    var msgRef = mRef.push()
+    var msg = HashMap<String, String>()
+    msg.put("addr", "aaaaaa")
+    msg.put("id", "1")
+    msg.put("name", "bbb")
+    msg.put("tel", "12345678")
+    msgRef.setValue(msg)
+    Log.v("TEST", "shop list 002")
+
+ */
 }
 
 @Composable
