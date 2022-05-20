@@ -1,5 +1,6 @@
 package com.example.firebasedemo
 
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -38,6 +39,8 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.ktx.storage
 
 /*
     Author: Joey yang
@@ -54,8 +57,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var analytics: FirebaseAnalytics
     private lateinit var auth: FirebaseAuth
     private lateinit var database: FirebaseDatabase
+    private lateinit var storage: FirebaseStorage
     private val mainViewModel by viewModels<MainViewModel>()
 
+    //TODO("Need to join APP check, ref: https://www.youtube.com/watch?v=Fjj4fmr2t04&feature=emb_imp_woyt")
+    //TODO("Storage rules adjust: ref: udemy firebase class Ch23")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -63,7 +69,7 @@ class MainActivity : ComponentActivity() {
             auth = Firebase.auth
             //重要,若伺服器選美國,就只要用Firebase.database即可,否則要把資料庫的根網址寫入,如下
             database = Firebase.database("https://myfirebase2022-31c42-default-rtdb.asia-southeast1.firebasedatabase.app")
-
+            storage = Firebase.storage("gs://myfirebase2022-31c42.appspot.com")
 
             FirebaseDemoTheme {
                 val navController = rememberNavController() //Navigation Step2
@@ -92,10 +98,15 @@ class MainActivity : ComponentActivity() {
                         //second screen
                         ShopScreen05Show(navController = navController, auth, this@MainActivity, mainViewModel, database)
                     }
+                    composable("shop_image_upload") {
+                        //second screen
+                        ShopScreen06ImageUpload(navController = navController, auth, this@MainActivity, mainViewModel, database, storage)
+                    }
                 }
             }
         }
     }
+
 }
 
 @Composable
@@ -103,7 +114,7 @@ fun InitialScreen01(navController: NavController) {
     val interactionSourceTest = remember { MutableInteractionSource() }
     val pressState = interactionSourceTest.collectIsPressedAsState()
     val colorMy = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
-    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info")
+    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info", "upload shop image")
 
     Column(verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -116,6 +127,7 @@ fun InitialScreen01(navController: NavController) {
                         "Anonymous login" -> navController.navigate("login_screen")
                         "e-mail login" -> navController.navigate("loginMail_screen")
                         "show shop table info" -> navController.navigate("shop_screen_info")
+                        "upload shop image" -> navController.navigate("shop_image_upload")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(1f),
@@ -455,6 +467,56 @@ fun TextFieldShow(from: Int, value: String, valueAlter: (info: String) -> Unit) 
     )
 }
 
+@Composable
+fun ShopScreen06ImageUpload(navController: NavController, auth: FirebaseAuth, mainActivity: MainActivity, mainViewModel: MainViewModel, database: FirebaseDatabase, storage: FirebaseStorage) {
+    val interactionSourceTest = remember { MutableInteractionSource() }
+    val pressState = interactionSourceTest.collectIsPressedAsState()
+    val borderColor = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
+
+    Column(verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Upload shop image",
+            modifier = Modifier.clickable(onClick = {
+                navController.navigate("initial_screen")
+            })
+        )
+        Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
+            modifier = Modifier.fillMaxHeight(0.5f),
+            //enabled = false,
+            enabled = true, //如果 enabled 設為false, border, interactionSource就不會有變化
+            interactionSource = interactionSourceTest,
+            elevation = ButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 8.dp,
+                disabledElevation = 2.dp
+            ),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(5.dp, color = borderColor),
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = Color.White,
+                contentColor = Color.Red
+            ),
+            contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
+            onClick = {
+                var file = Uri.parse("android.resource://com.example.firebasedemo/drawable/image_lanlan")
+                //var imagePath = "file://sdcard/Download/53473827_354059921901700_4038650457431651202_n.jpg"
+                //var file = Uri.parse(imagePath)
+                //Log.v("TEST", "file: ${file.toString()}")
+                var storageRef = storage.reference.child("images/test01.jpg")
+
+                var uploadTask = storageRef.putFile(file)
+                uploadTask.addOnSuccessListener { listener ->
+                    Toast.makeText(mainActivity, "Upload success", Toast.LENGTH_LONG).show()
+                }.addOnFailureListener { listener ->
+                    Toast.makeText(mainActivity, "Upload fail", Toast.LENGTH_LONG).show()
+                }
+            })
+        {
+            Text(text = "Upload image")
+        }
+    }
+}
 
 @Preview(showBackground = true)
 @Composable
