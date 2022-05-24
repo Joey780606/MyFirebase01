@@ -1,5 +1,6 @@
 package com.example.firebasedemo
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat.startActivityForResult
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -33,14 +35,12 @@ import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.ktx.storage
+import java.io.File
 
 /*
     Author: Joey yang
@@ -53,6 +53,7 @@ import com.google.firebase.storage.ktx.storage
        auth.createUserWithEmailAndPassword
 
  */
+const val SELECT_FILE_ID: Int = 10
 class MainActivity : ComponentActivity() {
     private lateinit var analytics: FirebaseAnalytics
     private lateinit var auth: FirebaseAuth
@@ -83,11 +84,9 @@ class MainActivity : ComponentActivity() {
                         InitialScreen01(navController = navController)
                     }
                     composable("login_screen") {
-                        //first screen
                         LoginScreen02(navController = navController, auth, this@MainActivity)
                     }
                     composable("loginMail_screen") {
-                        //first screen
                         LoginMailScreen03(navController = navController, auth, this@MainActivity, mainViewModel)
                     }
                     composable("loginNewUser_screen") {
@@ -95,18 +94,37 @@ class MainActivity : ComponentActivity() {
                         LoginNewUser04(navController = navController, auth, this@MainActivity)
                     }
                     composable("shop_screen_info") {
-                        //second screen
                         ShopScreen05Show(navController = navController, auth, this@MainActivity, mainViewModel, database)
                     }
                     composable("shop_image_upload") {
-                        //second screen
                         ShopScreen06ImageUpload(navController = navController, auth, this@MainActivity, mainViewModel, database, storage)
+                    }
+                    composable("shop_image_upload2") {
+                        ShopScreen07ImageUpload2(navController = navController, auth, this@MainActivity, mainViewModel, database, storage)
                     }
                 }
             }
         }
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            SELECT_FILE_ID -> if (data != null) {
+                //Log.v("TEST", "Choice file: ${data.data?.path}")
+                Log.v("TEST", "Choice file: ${File(data.data?.path).name}")
+
+                data.data?.let { uriInfo ->
+                    mainViewModel.setReceivePictureUri(uriInfo)
+                }
+//  Note: Already mark, but still need to study.
+//                when(data.data?.scheme) {
+//                    ContentResolver.SCHEME_CONTENT -> Log.v("TEST", "Choice file2: ${getContentFileName(data.data!!)}")
+//                    else -> Log.v("TEST", "Choice file3: ${data.data?.path?.let(::File)?.name}")
+//                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -114,7 +132,7 @@ fun InitialScreen01(navController: NavController) {
     val interactionSourceTest = remember { MutableInteractionSource() }
     val pressState = interactionSourceTest.collectIsPressedAsState()
     val colorMy = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
-    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info", "upload shop image")
+    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info", "upload shop image", "upload shop image from mobile")
 
     Column(verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -128,6 +146,7 @@ fun InitialScreen01(navController: NavController) {
                         "e-mail login" -> navController.navigate("loginMail_screen")
                         "show shop table info" -> navController.navigate("shop_screen_info")
                         "upload shop image" -> navController.navigate("shop_image_upload")
+                        "upload shop image from mobile" -> navController.navigate("shop_image_upload2")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(1f),
@@ -514,6 +533,63 @@ fun ShopScreen06ImageUpload(navController: NavController, auth: FirebaseAuth, ma
             })
         {
             Text(text = "Upload image")
+        }
+    }
+}
+
+@Composable
+fun ShopScreen07ImageUpload2(navController: NavController, auth: FirebaseAuth, mainActivity: MainActivity, mainViewModel: MainViewModel, database: FirebaseDatabase, storage: FirebaseStorage) {
+    val interactionSourceTest = remember { MutableInteractionSource() }
+    val pressState = interactionSourceTest.collectIsPressedAsState()
+    val borderColor = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
+
+    val pictureFileUrl by mainViewModel._pictureFieUri.observeAsState(null)
+
+    Column(verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Upload shop image from mobile",
+            modifier = Modifier.clickable(onClick = {
+                navController.navigate("initial_screen")
+            })
+        )
+        Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
+            modifier = Modifier.fillMaxHeight(0.5f),
+            //enabled = false,
+            enabled = true, //如果 enabled 設為false, border, interactionSource就不會有變化
+            interactionSource = interactionSourceTest,
+            elevation = ButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 8.dp,
+                disabledElevation = 2.dp
+            ),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(5.dp, color = borderColor),
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = Color.White,
+                contentColor = Color.Red
+            ),
+            contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
+            onClick = {
+                var fileIntent = Intent(Intent.ACTION_GET_CONTENT).setType("*/*")
+                val mimeTypes = arrayOf("image/*", "video/*")   //我們只要Image, 但為測試多個可能,就把二個都加入,但實測上發現沒有效果
+                fileIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+                startActivityForResult(mainActivity, fileIntent, SELECT_FILE_ID, null)
+            })
+        {
+            Text(text = "Upload image from mobile phone")
+        }
+    }
+
+    pictureFileUrl?.let { uriInfo ->
+        var fileName = mainViewModel.getFileName(uriInfo, mainActivity)
+        var storageRef = storage.reference.child("images/" + fileName)
+
+        var uploadTask = storageRef.putFile(uriInfo)
+        uploadTask.addOnSuccessListener { listener ->
+            Toast.makeText(mainActivity, "Upload success", Toast.LENGTH_LONG).show()
+        }.addOnFailureListener { listener ->
+            Toast.makeText(mainActivity, "Upload fail", Toast.LENGTH_LONG).show()
         }
     }
 }

@@ -1,5 +1,8 @@
 package com.example.firebasedemo
 
+import android.content.ContentResolver
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -10,6 +13,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import java.io.File
 
 class MainViewModel: ViewModel() {
     val _loginUser = MutableLiveData<FirebaseUser>()
@@ -17,6 +21,9 @@ class MainViewModel: ViewModel() {
 
     val _shopInfo = MutableLiveData<MutableList<Shop>>()
     val shopInfo: LiveData<MutableList<Shop>> = _shopInfo
+
+    val _pictureFieUri = MutableLiveData<Uri>()
+    val pictureFieUri: LiveData<Uri> = _pictureFieUri
 
     fun updateUserStatus(auth: FirebaseAuth) {
         _loginUser.value = auth.currentUser
@@ -55,6 +62,37 @@ class MainViewModel: ViewModel() {
                 }
             })
     }
+
+    fun setReceivePictureUri(uriInfo: Uri) {
+        _pictureFieUri.value = uriInfo
+    }
+
+    fun getFileName(uriInfo: Uri, activity: MainActivity): String {
+        when(uriInfo.scheme) {
+            ContentResolver.SCHEME_CONTENT -> {
+                Log.v("TEST", "Choice file2: ${getContentFileName(uriInfo, activity)}")
+                getContentFileName(uriInfo, activity)?.let { stringInfo ->
+                    return stringInfo
+                }
+                return ""
+            }
+            else -> {
+                Log.v("TEST", "Choice file3: ${uriInfo.path?.let(::File)?.name}")
+                uriInfo.path?.let(::File)?.let{ fileInfo ->
+                    return fileInfo.name
+                }
+                return ""
+            }
+        }
+    }
+
+    //Important: Need to learning.
+    private fun getContentFileName(uri: Uri, activity: MainActivity): String? = runCatching {
+        activity.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            cursor.moveToFirst()
+            return@use cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
+        }
+    }.getOrNull()
 
     companion object {
         val TEXT_EMAIL = 1
