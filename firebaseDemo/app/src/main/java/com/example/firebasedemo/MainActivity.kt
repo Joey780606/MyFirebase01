@@ -1,8 +1,11 @@
 package com.example.firebasedemo
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -24,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.app.ActivityCompat.startActivityForResult
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
@@ -40,7 +44,7 @@ import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.ktx.storage
-import java.io.File
+import java.io.*
 
 /*
     Author: Joey yang
@@ -52,8 +56,16 @@ import java.io.File
     3. Mail login function:
        auth.createUserWithEmailAndPassword
 
+    Use skill:
+    1. Permission
+    2. Save file to mobile.
+    3. Upload text file and get text.
+
  */
 const val SELECT_FILE_ID: Int = 10
+const val SELECT_TEXT_FILE_ID: Int = 11
+const val REQUEST_PERMISSIONS_WRITE_EXTERNAL_STORAGE = 102
+
 class MainActivity : ComponentActivity() {
     private lateinit var analytics: FirebaseAnalytics
     private lateinit var auth: FirebaseAuth
@@ -61,10 +73,56 @@ class MainActivity : ComponentActivity() {
     private lateinit var storage: FirebaseStorage
     private val mainViewModel by viewModels<MainViewModel>()
 
+    private val requiredPermissions = object : ArrayList<String>() {
+        init {
+            add("android.permission.WRITE_EXTERNAL_STORAGE")
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        var ivalue = -1
+        when (requestCode) {
+            REQUEST_PERMISSIONS_WRITE_EXTERNAL_STORAGE -> {
+                var i = 0
+                while (i < permissions.size) {
+                    if (ivalue == -1) {
+                        if (grantResults[i] == PackageManager.PERMISSION_GRANTED && permissions[i] == "android.permission.WRITE_EXTERNAL_STORAGE") {
+                            ivalue = 1
+                            break
+                        }
+                    }
+                    i++
+                }
+                if (permissions.isNotEmpty() && ivalue == 1) {
+                }
+            }
+            else -> {
+            }
+        }
+    }
+
+    private fun checkPermissionsThenInitSdk() {
+        val requestedPermissions: MutableList<String> = ArrayList()
+        for (requiredPermission in this.requiredPermissions) {
+            if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(requiredPermission) == PackageManager.PERMISSION_DENIED) {
+                requestedPermissions.add(requiredPermission)
+            }
+        }
+        if (requestedPermissions.size == 0) {
+        } else {
+            ActivityCompat.requestPermissions(  // 重要
+                this,
+                requestedPermissions.toTypedArray(), REQUEST_PERMISSIONS_WRITE_EXTERNAL_STORAGE
+            )
+        }
+    }
+
     //TODO("Need to join APP check, ref: https://www.youtube.com/watch?v=Fjj4fmr2t04&feature=emb_imp_woyt")
     //TODO("Storage rules adjust: ref: udemy firebase class Ch23")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        checkPermissionsThenInitSdk()
         setContent {
             analytics = Firebase.analytics
             auth = Firebase.auth
@@ -102,6 +160,9 @@ class MainActivity : ComponentActivity() {
                     composable("shop_image_upload2") {
                         ShopScreen07ImageUpload2(navController = navController, auth, this@MainActivity, mainViewModel, database, storage)
                     }
+                    composable("shop_txt_process") {
+                        ShopTxtProcess08(navController = navController,this@MainActivity, mainViewModel)
+                    }
                 }
             }
         }
@@ -123,7 +184,40 @@ class MainActivity : ComponentActivity() {
 //                    else -> Log.v("TEST", "Choice file3: ${data.data?.path?.let(::File)?.name}")
 //                }
             }
+            SELECT_TEXT_FILE_ID -> if (data != null) {
+                Log.v("TEST", "Choice file: ${data.data?.toString()}")
+                if(resultCode == RESULT_OK) {
+                    data.data?.let { uri ->
+                        var fileContent = readTextFile(uri)
+                        this@MainActivity.mainViewModel.setTxtFileContent(fileContent)
+                        Log.v("TEST", "file content: $fileContent")
+                    }
+
+                }
+            }
         }
+    }
+
+    private fun readTextFile(uri: Uri): String {
+        var reader: BufferedReader? = null
+        val builder = StringBuilder()
+        try {
+            reader = BufferedReader(InputStreamReader(contentResolver.openInputStream(uri)))
+            var line: String? = ""
+            while (reader.readLine().also { line = it } != null) {
+                builder.append(line)
+            }
+            reader.close()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return builder.toString()
+    }
+
+    companion object {
+        val TEXT_FILE_SAMPLE = "0,一鴻燒臘,25569779,台北市大同區南京西路232號\n" +
+                "1,脆皮鴨腿飯,140\n" +
+                "1,玫塊雞腿飯,120\n"
     }
 }
 
@@ -132,7 +226,7 @@ fun InitialScreen01(navController: NavController) {
     val interactionSourceTest = remember { MutableInteractionSource() }
     val pressState = interactionSourceTest.collectIsPressedAsState()
     val colorMy = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
-    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info", "upload shop image", "upload shop image from mobile")
+    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info", "upload shop image", "upload shop image from mobile", "Shop text info process")
 
     Column(verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -147,6 +241,7 @@ fun InitialScreen01(navController: NavController) {
                         "show shop table info" -> navController.navigate("shop_screen_info")
                         "upload shop image" -> navController.navigate("shop_image_upload")
                         "upload shop image from mobile" -> navController.navigate("shop_image_upload2")
+                        "Shop text info process" -> navController.navigate("shop_txt_process")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(1f),
@@ -591,6 +686,98 @@ fun ShopScreen07ImageUpload2(navController: NavController, auth: FirebaseAuth, m
         }.addOnFailureListener { listener ->
             Toast.makeText(mainActivity, "Upload fail", Toast.LENGTH_LONG).show()
         }
+    }
+}
+
+@Composable
+fun ShopTxtProcess08(navController: NavController, mainActivity: MainActivity, mainViewModel: MainViewModel) {
+    val interactionSourceTest = remember { MutableInteractionSource() }
+    val pressState = interactionSourceTest.collectIsPressedAsState()
+    val borderColor = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
+
+    val fileContent by mainViewModel._textFileContent.observeAsState("")
+    Column(modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally) {
+
+        Row(
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
+                enabled = true, //如果 enabled 設為false, border, interactionSource就不會有變化
+                interactionSource = interactionSourceTest,
+                elevation = ButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp,
+                    disabledElevation = 2.dp
+                ),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(5.dp, color = borderColor),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color.White,
+                    contentColor = Color.Red
+                ),
+                contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
+                onClick = {
+                    var fileIntent = Intent(Intent.ACTION_GET_CONTENT).setType("text/plain")
+                    //val mimeTypes =
+                    //    arrayOf("image/*", "video/*")   //我們只要Image, 但為測試多個可能,就把二個都加入,但實測上發現沒有效果
+                    //fileIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+                    startActivityForResult(mainActivity, fileIntent, SELECT_TEXT_FILE_ID, null)
+                })
+            {
+                Text(text = "Upload txt file")
+            }
+
+            Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
+                enabled = true, //如果 enabled 設為false, border, interactionSource就不會有變化
+                interactionSource = interactionSourceTest,
+                elevation = ButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp,
+                    disabledElevation = 2.dp
+                ),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(5.dp, color = borderColor),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color.White,
+                    contentColor = Color.Red
+                ),
+                contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
+                onClick = {
+                    var inputStream: InputStream = MainActivity.TEXT_FILE_SAMPLE.byteInputStream()
+                        //val storeDirectory = mainActivity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) // DCIM folder
+                    //val storeDirectory = mainActivity.getExternalFilesDir(Environment.DIRECTORY_DCIM)
+                    val storeDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+
+                        val outputFile = File(storeDirectory, "testing-again2.txt")
+                        inputStream.use { input ->
+                            val outputStream = FileOutputStream(outputFile)
+                            outputStream.use { output ->
+                                val buffer = ByteArray(4 * 1024) // buffer size
+                                while (true) {
+                                    val byteCount = input.read(buffer)
+                                    if (byteCount < 0) break
+                                    output.write(buffer, 0, byteCount)
+                                }
+                                output.flush()
+                                output.close()
+                                Log.v("TEST", "download file success")
+                            }
+                        }
+                })
+            {
+                Text(text = "Download txt file")
+            }
+        }
+        Text(
+            text = fileContent,
+            modifier = Modifier.clickable(onClick = {
+                navController.navigate("initial_screen")
+            })
+        )
     }
 }
 

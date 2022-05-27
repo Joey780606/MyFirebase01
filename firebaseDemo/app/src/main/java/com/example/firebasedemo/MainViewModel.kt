@@ -25,6 +25,9 @@ class MainViewModel: ViewModel() {
     val _pictureFieUri = MutableLiveData<Uri>()
     val pictureFieUri: LiveData<Uri> = _pictureFieUri
 
+    val _textFileContent = MutableLiveData<String>()
+    val textFileContent: LiveData<String> = _textFileContent
+
     fun updateUserStatus(auth: FirebaseAuth) {
         _loginUser.value = auth.currentUser
     }
@@ -93,6 +96,10 @@ class MainViewModel: ViewModel() {
             return@use cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
         }
     }.getOrNull()
+
+    fun setTxtFileContent(content: String) {
+        _textFileContent.value = content
+    }
 
     companion object {
         val TEXT_EMAIL = 1
