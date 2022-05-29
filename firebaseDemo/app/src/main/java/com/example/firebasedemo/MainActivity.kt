@@ -34,6 +34,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.firebasedemo.ui.theme.*
+import com.google.android.gms.tasks.Task
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.auth.FirebaseAuth
@@ -42,6 +43,7 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.ktx.storage
 import java.io.*
@@ -164,6 +166,18 @@ class MainActivity : ComponentActivity() {
                         ShopTxtProcess08(navController = navController,this@MainActivity, mainViewModel)
                     }
                 }
+            }
+
+            // 取得 Token
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task: Task<String> ->
+                if (!task.isSuccessful) {
+                    return@addOnCompleteListener
+                }
+
+                val token = task.result
+
+                Log.d("FCMService", "Token is: $token")
+                Toast.makeText(baseContext, "Token is: $token", Toast.LENGTH_SHORT).show()
             }
         }
     }

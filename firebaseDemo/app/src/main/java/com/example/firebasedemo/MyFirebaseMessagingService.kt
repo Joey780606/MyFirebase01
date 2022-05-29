@@ -6,9 +6,10 @@ import com.google.firebase.messaging.RemoteMessage
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
     private val tag = "FCMService"
+
     override fun onNewToken(value: String) {
         super.onNewToken(value)
-        Log.v("Test", "Token = $value")
+        Log.v(tag, "Token = $value")
     }
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {  //收到推播後要做什麼事情
