@@ -42,6 +42,8 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ktx.database
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.FirebaseStorage
@@ -73,6 +75,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var database: FirebaseDatabase
     private lateinit var storage: FirebaseStorage
+    private lateinit var firestore: FirebaseFirestore
     private val mainViewModel by viewModels<MainViewModel>()
 
     private val requiredPermissions = object : ArrayList<String>() {
@@ -131,7 +134,7 @@ class MainActivity : ComponentActivity() {
             //重要,若伺服器選美國,就只要用Firebase.database即可,否則要把資料庫的根網址寫入,如下
             database = Firebase.database("https://myfirebase2022-31c42-default-rtdb.asia-southeast1.firebasedatabase.app")
             storage = Firebase.storage("gs://myfirebase2022-31c42.appspot.com")
-
+            firestore = Firebase.firestore
             FirebaseDemoTheme {
                 val navController = rememberNavController() //Navigation Step2
 
@@ -164,6 +167,9 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("shop_txt_process") {
                         ShopTxtProcess08(navController = navController,this@MainActivity, mainViewModel)
+                    }
+                    composable("firebase_db") {
+                        FirebaseDB09(navController = navController,this@MainActivity, mainViewModel, firestore)
                     }
                 }
             }
@@ -240,7 +246,7 @@ fun InitialScreen01(navController: NavController) {
     val interactionSourceTest = remember { MutableInteractionSource() }
     val pressState = interactionSourceTest.collectIsPressedAsState()
     val colorMy = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
-    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info", "upload shop image", "upload shop image from mobile", "Shop text info process")
+    val itemList = listOf("Anonymous login", "e-mail login", "show shop table info", "upload shop image", "upload shop image from mobile", "Shop text info process", "firebase test")
 
     Column(verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -256,6 +262,7 @@ fun InitialScreen01(navController: NavController) {
                         "upload shop image" -> navController.navigate("shop_image_upload")
                         "upload shop image from mobile" -> navController.navigate("shop_image_upload2")
                         "Shop text info process" -> navController.navigate("shop_txt_process")
+                        "firebase test" -> navController.navigate("firebase_db")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(1f),
@@ -792,6 +799,160 @@ fun ShopTxtProcess08(navController: NavController, mainActivity: MainActivity, m
                 navController.navigate("initial_screen")
             })
         )
+    }
+}
+
+@Composable
+fun FirebaseDB09(navController: NavController, mainActivity: MainActivity, mainViewModel: MainViewModel, firestore: FirebaseFirestore) {
+    // 集合 (Collection) 可以被視為目錄
+    // 文件 (Document) 可視為目錄下的檔案,但是目錄下,可以放檔案,也可以再放一個目錄,所以Document裡也可以再生一些Collection
+    // 這樣就跟檔案系統有點像
+
+    val store1 = hashMapOf(
+        "addr" to "台北市大同區南京西路232號",
+        "id" to "0",
+        "name" to "一鴻燒臘",
+        "tel" to "25569779"
+    )
+
+    val store2 = hashMapOf(
+        "addr" to "台北市長安西路256號",
+        "id" to "1",
+        "name" to "金仙蝦捲飯",
+        "tel" to "25595759"
+    )
+
+    val interactionSourceTest = remember { MutableInteractionSource() }
+    val pressState = interactionSourceTest.collectIsPressedAsState()
+    val borderColor = if (pressState.value) YellowFFEB3B else Green4CAF50 //Import com.pcp.composecomponent.ui.theme.YellowFFEB3B
+
+    val fileContent by mainViewModel._textFileContent.observeAsState("")
+    Column(modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally) {
+
+        Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
+            enabled = true, //如果 enabled 設為false, border, interactionSource就不會有變化
+            interactionSource = interactionSourceTest,
+            elevation = ButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 8.dp,
+                disabledElevation = 2.dp
+            ),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(5.dp, color = borderColor),
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = Color.White,
+                contentColor = Color.Red
+            ),
+            contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
+            onClick = {
+                val bentoSite = firestore.collection("bento")
+                bentoSite.document("store")
+                    //.add(store)
+                    .set(store1)
+                    .addOnSuccessListener { documentReference ->
+                        Log.d("TEST", "DocumentSnapshot added with ID: $documentReference")
+                        Toast.makeText(mainActivity, "DocumentSnapshot added with ID: ${documentReference}", Toast.LENGTH_LONG).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("TEST", "Error adding document", )
+                        Toast.makeText(mainActivity, "Error adding document: $e" , Toast.LENGTH_LONG).show()
+                    }
+
+                bentoSite.document("store2")
+                    //.add(store)
+                    .set(store2)
+                    .addOnSuccessListener { documentReference ->
+                        Log.d("TEST", "DocumentSnapshot added with ID2: $documentReference")
+                        Toast.makeText(mainActivity, "DocumentSnapshot added with ID: ${documentReference}", Toast.LENGTH_LONG).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("TEST", "Error adding document", )
+                        Toast.makeText(mainActivity, "Error adding document2: $e" , Toast.LENGTH_LONG).show()
+                    }
+            })
+        {
+            Text(text = "Add data to DB")
+        }
+        Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
+            enabled = true, //如果 enabled 設為false, border, interactionSource就不會有變化
+            interactionSource = interactionSourceTest,
+            elevation = ButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 8.dp,
+                disabledElevation = 2.dp
+            ),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(5.dp, color = borderColor),
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = Color.White,
+                contentColor = Color.Red
+            ),
+            contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
+            onClick = {
+                val bentoSite = firestore.collection("bento")
+                bentoSite
+                    .get()
+                    .addOnSuccessListener { result ->
+                        for (document in result) {
+                            Log.d("Test", "check info: ${document.id} => ${document.data}")
+                        }
+                    }
+                    .addOnFailureListener { exception ->
+                        Log.d("Test", "Error getting documents: ", exception)
+                    }
+
+                for(i in 1..5) {
+                    val randoms = (100000..999999).random()
+                    Log.v("TEST", "random value $randoms")
+                }
+            })
+        {
+            Text(text = "Get data from DB")
+        }
+
+        Button( //Button只是一個容器,裡面要放文字,就是要再加一個Text
+            enabled = true, //如果 enabled 設為false, border, interactionSource就不會有變化
+            interactionSource = interactionSourceTest,
+            elevation = ButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 8.dp,
+                disabledElevation = 2.dp
+            ),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(5.dp, color = borderColor),
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = Color.White,
+                contentColor = Color.Red
+            ),
+            contentPadding = PaddingValues(4.dp, 3.dp, 2.dp, 1.dp),
+            onClick = {
+                val bentoSite = firestore.collection("bento").document("store3").collection("storeInfo")
+                bentoSite.document("hotel1")
+                    .set(store1)
+                    .addOnSuccessListener { documentReference ->
+                        Log.d("TEST", "DocumentSnapshot added with ID: $documentReference")
+                        Toast.makeText(mainActivity, "DocumentSnapshot added with ID: ${documentReference}", Toast.LENGTH_LONG).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("TEST", "Error adding document", )
+                        Toast.makeText(mainActivity, "Error adding document: $e" , Toast.LENGTH_LONG).show()
+                    }
+                bentoSite.document("hotel2")
+                    .set(store2)
+                    .addOnSuccessListener { documentReference ->
+                        Log.d("TEST", "DocumentSnapshot added with ID: $documentReference")
+                        Toast.makeText(mainActivity, "DocumentSnapshot added with ID: ${documentReference}", Toast.LENGTH_LONG).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("TEST", "Error adding document", )
+                        Toast.makeText(mainActivity, "Error adding document: $e" , Toast.LENGTH_LONG).show()
+                    }
+            })
+        {
+            Text(text = "Deep study")
+        }
     }
 }
 
